@@ -24,8 +24,8 @@
 
 | # | Phase | Priority | Status |
 |---|---|---|---|
-| 1 | Config model: `[project]` + `[[registry]]` array | critical-path | ◐ in progress |
-| 2 | Self-containment: rewrite internal deps to `registry = "…"` | critical-path | ☐ not started |
+| 1 | Config model: `[project]` + `[[registry]]` array | critical-path | ✅ done (gate-green) |
+| 2 | Self-containment: rewrite internal deps to `registry = "…"` | critical-path | ◐ in progress |
 | 3 | crates.io mirror + rate-safe batching + 429 retry | critical-path | ☐ not started |
 | 4 | Bump defaults (Jetstream ruleset) + tag-baseline default | important | ☐ not started |
 | 5 | Whole-repo release PR + opt-in flag (default false) | secondary | ☐ not started |
