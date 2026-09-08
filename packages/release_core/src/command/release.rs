@@ -99,6 +99,11 @@ impl ReleaseRequest {
     self.self_contained
   }
 
+  /// The configured registry name, if any.
+  pub fn registry_name(&self) -> Option<&str> {
+    self.registry.as_deref()
+  }
+
   pub fn with_token(mut self, token: impl Into<SecretString>) -> Self {
     self.token = Some(token.into());
     self
@@ -633,6 +638,25 @@ async fn release_packages(
   if packages.is_empty() {
     info!("nothing to release");
   }
+
+  // Self-contained publishing: rewrite internal deps to the primary registry before
+  // publishing, then restore the manifests when this guard drops (function return, error,
+  // or panic) so the checkout is left unchanged. The guard must outlive the publish loop.
+  let _self_contained_guard = if input.is_self_contained()
+    && let Some(registry) = input.registry_name()
+    && !packages.is_empty()
+  {
+    let manifest_paths: Vec<&Utf8Path> =
+      packages.iter().map(|p| p.manifest_path.as_path()).collect();
+    let internal_deps: std::collections::HashSet<&str> =
+      packages.iter().map(|p| p.name.as_str()).collect();
+    let backup = crate::self_contained::ManifestBackup::capture(&manifest_paths)?;
+    crate::self_contained::apply_self_containment(&manifest_paths, &internal_deps, registry)?;
+    info!("rewrote internal dependencies to registry `{registry}` (self-contained)");
+    Some(backup)
+  } else {
+    None
+  };
 
   let mut package_releases: Vec<PackageRelease> = vec![];
   // The same trusted publishing token can be used for all packages.
@@ -1226,7 +1250,9 @@ fn run_cargo_publish(
   if input.dry_run {
     args.push("--dry-run");
   }
-  if input.allow_dirty(&package.name) {
+  // Self-contained publishing intentionally edits the manifest in the checkout, so the
+  // tree is dirty by design; allow it.
+  if input.allow_dirty(&package.name) || input.is_self_contained() {
     args.push("--allow-dirty");
   }
   if input.no_verify(&package.name) {

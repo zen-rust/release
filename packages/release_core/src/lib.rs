@@ -24,6 +24,7 @@ mod release_order;
 pub(crate) mod release_regex;
 mod repo_url;
 mod response_ext;
+mod self_contained;
 pub mod semver_check;
 mod tera;
 mod tmp_repo;
