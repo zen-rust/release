@@ -1,7 +1,9 @@
 # zen-release — build progress
 
 **Target:** feature-complete per `AGENTS.md`, critical path (Phases 1–3) working, by morning.
-**Last updated:** 2026-09-07 (evening) — kickoff.
+**Last updated:** 2026-09-07 (late) — build loop paused; see status.
+
+> **STATUS: PAUSED — awaiting morning decisions.** All safely-verifiable, in-plan work is done and gate-green (Phases 1, 2-core, 4-core, 3-primitives). Everything remaining touches the **hot publish path** and needs the docker/integration suite (unavailable in this session) or a design decision. The 5-minute build loop was stopped to avoid idle ticks and shipping unverified publish-path code overnight. See **Remaining / morning** and **Decisions to confirm**. Restart with `/loop` after decisions.
 
 ## Gate status
 
@@ -26,7 +28,7 @@
 |---|---|---|---|
 | 1 | Config model: `[project]` + `[[registry]]` array | critical-path | ✅ done (gate-green) |
 | 2 | Self-containment: rewrite internal deps to `registry = "…"` | critical-path | ◐ in progress |
-| 3 | crates.io mirror + rate-safe batching + 429 retry | critical-path | ☐ not started |
+| 3 | crates.io mirror + rate-safe batching + 429 retry | critical-path | ◐ primitives done; orchestration deferred |
 | 4 | Bump defaults (Jetstream ruleset) + tag-baseline default | important | ◐ knobs+config done; tag-baseline deferred |
 | 5 | Whole-repo release PR + opt-in flag (default false) | secondary | ☐ not started |
 | 6 | Monorepo subtree config (`packages_dir`) | low | ☐ not started |
@@ -77,3 +79,7 @@ Decisions to confirm in the morning: (a) Phase 2 in-place-restore vs temp-copy; 
 
 - 2026-09-07 — Rebrand + restructure + version reset landed, gate green. Feature review done; `.agents/` scaffold created.
 - 2026-09-07 — Build loop started (cron every 5m). **Phase 1 config model landed**: `[project]` + `[[registry]]` structs, `RegistryKind`, load-time validation, schema regenerated. Gate green (fmt + clippy -D warnings + config tests). Next: round-trip test + thread into publish flow, then Phase 2.
+- 2026-09-07 — **Phase 2 core**: `Manifest::set_dependencies_registry`/`strip_dependencies_registry` (4 tests) + `ReleaseRequest` self-contained plumbing wired from config. Application on the publish path deferred (needs integration). Pushed.
+- 2026-09-07 — **Phase 4 core**: plumbed `breaking_always_increment_major` + `no_increment_regex` (2 tests, schema); Jetstream `no_increment_regex` set in `zen-release.toml` (^breaking→major omitted to stay <1.0). Pushed.
+- 2026-09-07 — **Phase 3 primitives**: `mirror.rs` with `into_batches` + `is_rate_limited` (6 tests). Pushed.
+- 2026-09-07 — **Loop paused.** Reached the ceiling of safely-verifiable work; remaining tasks need the integration suite or design decisions (see Remaining / Decisions). Cron `c33c8ffe` stopped. Dispatched summary to user. Commits: c995cee..529d772 on main.
