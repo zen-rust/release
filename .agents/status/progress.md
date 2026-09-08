@@ -3,7 +3,9 @@
 **Target:** feature-complete per `AGENTS.md`, critical path (Phases 1–3) working, by morning.
 **Last updated:** 2026-09-07 (late) — build loop paused; see status.
 
-> **STATUS: PAUSED at the Docker boundary.** Decisions answered (see `decisions/decisions.md`). **Landed & unit-gate-green:** Phase 1 (config model), Phase 2 (transform + application, in-place+RAII-restore), Phase 4-core (bump knobs + Jetstream config), Phase 3 primitives (`into_batches`, `is_rate_limited`, `strip_dependencies_registry`). **Remaining = Phase 3 mirror orchestration** — a second publish pass; all its building blocks exist and it's fully spec'd in `plans/build-plan.md` ("Wiring recipe"), but it's pure publish-flow integration that needs the **Docker integration suite** (unavailable here) to verify, so it wasn't built blind. Loop stopped (`615ebdc7`). Restart with `/loop` once you can run the integration suite, or hand me a runner with Docker.
+> **UPDATE 2026-09-08:** Integration suite green on user's Mac (after `cargo install cargo-semver-checks` + fixture-config rename fix). **Phase 3 mirror now implemented** (`publish_to_mirrors` in `release.rs`: strip via RAII guard, `into_batches`, idempotent skip, 429 back-off) and config-wired (`[[registry]]` after primary → mirrors); `run_cargo_publish` `--registry` refactored to the explicit param (verified no regression). All critical-path CODE is in and unit-green. **Only unverified seam:** an actual two-registry publish, which needs a second registry added to `tests/docker-compose.yml` (infra task) — logic is covered by unit tests. Older status below is superseded.
+>
+> **(superseded) STATUS: PAUSED at the Docker boundary.** Decisions answered (see `decisions/decisions.md`). **Landed & unit-gate-green:** Phase 1 (config model), Phase 2 (transform + application, in-place+RAII-restore), Phase 4-core (bump knobs + Jetstream config), Phase 3 primitives (`into_batches`, `is_rate_limited`, `strip_dependencies_registry`). **Remaining = Phase 3 mirror orchestration** — a second publish pass; all its building blocks exist and it's fully spec'd in `plans/build-plan.md` ("Wiring recipe"), but it's pure publish-flow integration that needs the **Docker integration suite** (unavailable here) to verify, so it wasn't built blind. Loop stopped (`615ebdc7`). Restart with `/loop` once you can run the integration suite, or hand me a runner with Docker.
 
 ## Gate status
 
@@ -29,7 +31,7 @@
 |---|---|---|---|
 | 1 | Config model: `[project]` + `[[registry]]` array | critical-path | ✅ done (gate-green) |
 | 2 | Self-containment: rewrite internal deps to `registry = "…"` | critical-path | ◐ implemented (unit-green); Docker integration pending |
-| 3 | crates.io mirror + rate-safe batching + 429 retry | critical-path | ◐ primitives done; orchestration deferred |
+| 3 | crates.io mirror + rate-safe batching + 429 retry | critical-path | ◐ implemented + config-wired (unit-green); two-registry e2e needs infra |
 | 4 | Bump defaults (Jetstream ruleset) + tag-baseline default | important | ◐ knobs+config done; tag-baseline deferred |
 | 5 | Whole-repo release PR + opt-in flag (default false) | secondary | ☐ not started |
 | 6 | Monorepo subtree config (`packages_dir`) | low | ☐ not started |
