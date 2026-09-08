@@ -55,6 +55,7 @@
       "$ref": "#/$defs/Workspace",
       "default": {
         "allow_dirty": null,
+        "breaking_always_increment_major": null,
         "changelog_config": null,
         "changelog_path": null,
         "changelog_update": null,
@@ -73,6 +74,7 @@
         "git_tag_enable": null,
         "git_tag_name": null,
         "max_analyze_commits": 1000,
+        "no_increment_regex": null,
         "pr_body": null,
         "pr_branch_prefix": null,
         "pr_draft": false,
@@ -290,6 +292,14 @@
       "description": "Config at the `[[package]]` level.",
       "type": "object",
       "properties": {
+        "breaking_always_increment_major": {
+          "title": "Breaking Always Increment Major",
+          "description": "If true, breaking changes always bump the major version, even in 0.x releases.\nIf false (default), breaking changes bump the minor version in 0.x releases.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "changelog_include": {
           "title": "Changelog Include",
           "description": "List of package names.\nInclude the changelogs of these packages in the changelog of the current package.",
@@ -427,6 +437,14 @@
         },
         "name": {
           "type": "string"
+        },
+        "no_increment_regex": {
+          "title": "No Increment Regex",
+          "description": "Custom regex to match commit types that should trigger NO version increment\n(e.g. `wip`, `chore`). Useful when using non-conventional commit prefixes.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "publish": {
           "title": "Publish",
@@ -690,6 +708,14 @@
             "null"
           ]
         },
+        "breaking_always_increment_major": {
+          "title": "Breaking Always Increment Major",
+          "description": "If true, breaking changes always bump the major version, even in 0.x releases.\nIf false (default), breaking changes bump the minor version in 0.x releases.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "changelog_config": {
           "title": "Changelog Config",
           "description": "Path to the git cliff configuration file. Defaults to the `keep a changelog` configuration.",
@@ -839,6 +865,14 @@
           "format": "uint32",
           "default": 1000,
           "minimum": 0
+        },
+        "no_increment_regex": {
+          "title": "No Increment Regex",
+          "description": "Custom regex to match commit types that should trigger NO version increment\n(e.g. `wip`, `chore`). Useful when using non-conventional commit prefixes.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "pr_body": {
           "title": "PR Body",

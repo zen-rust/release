@@ -573,6 +573,14 @@ pub struct PackageConfig {
   /// Custom regex to match commit types that should trigger a major version increment.
   /// Useful when using non-conventional commit prefixes.
   pub custom_major_increment_regex: Option<String>,
+  /// # Breaking Always Increment Major
+  /// If true, breaking changes always bump the major version, even in 0.x releases.
+  /// If false (default), breaking changes bump the minor version in 0.x releases.
+  pub breaking_always_increment_major: Option<bool>,
+  /// # No Increment Regex
+  /// Custom regex to match commit types that should trigger NO version increment
+  /// (e.g. `wip`, `chore`). Useful when using non-conventional commit prefixes.
+  pub no_increment_regex: Option<String>,
 }
 
 impl From<PackageConfig> for zen_release_core::UpdateConfig {
@@ -587,6 +595,8 @@ impl From<PackageConfig> for zen_release_core::UpdateConfig {
       changelog_path: config.changelog_path.map(|p| to_utf8_pathbuf(p).unwrap()),
       custom_minor_increment_regex: config.custom_minor_increment_regex,
       custom_major_increment_regex: config.custom_major_increment_regex,
+      breaking_always_increment_major: config.breaking_always_increment_major == Some(true),
+      no_increment_regex: config.no_increment_regex,
       git_only: config.git_only,
     }
   }
@@ -636,6 +646,10 @@ impl PackageConfig {
       custom_major_increment_regex: self
         .custom_major_increment_regex
         .or(default.custom_major_increment_regex),
+      breaking_always_increment_major: self
+        .breaking_always_increment_major
+        .or(default.breaking_always_increment_major),
+      no_increment_regex: self.no_increment_regex.or(default.no_increment_regex),
       git_only: self.git_only.or(default.git_only),
     }
   }

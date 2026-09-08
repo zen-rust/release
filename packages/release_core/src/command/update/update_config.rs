@@ -28,6 +28,12 @@ pub struct UpdateConfig {
   pub custom_minor_increment_regex: Option<String>,
   /// Custom regex to match commit types that should trigger a major version increment.
   pub custom_major_increment_regex: Option<String>,
+  /// - If `true`, breaking changes always bump the major version, even in 0.x releases.
+  /// - If `false` (default), breaking changes bump the minor version in 0.x releases.
+  pub breaking_always_increment_major: bool,
+  /// Custom regex to match commit types that should trigger NO version increment
+  /// (e.g. `wip`, `chore`).
+  pub no_increment_regex: Option<String>,
   /// Whether to use git tags instead of registry for determining package versions.
   pub git_only: Option<bool>,
 }
@@ -84,6 +90,8 @@ impl Default for UpdateConfig {
       changelog_path: None,
       custom_minor_increment_regex: None,
       custom_major_increment_regex: None,
+      breaking_always_increment_major: false,
+      no_increment_regex: None,
     }
   }
 }
@@ -116,12 +124,16 @@ impl UpdateConfig {
 
   pub fn version_updater(&self) -> Result<VersionUpdater, regex::Error> {
     let mut updater = VersionUpdater::default()
-      .with_features_always_increment_minor(self.features_always_increment_minor);
+      .with_features_always_increment_minor(self.features_always_increment_minor)
+      .with_breaking_always_increment_major(self.breaking_always_increment_major);
     if let Some(regex) = &self.custom_minor_increment_regex {
       updater = updater.with_custom_minor_increment_regex(regex)?;
     }
     if let Some(regex) = &self.custom_major_increment_regex {
       updater = updater.with_custom_major_increment_regex(regex)?;
+    }
+    if let Some(regex) = &self.no_increment_regex {
+      updater = updater.with_no_increment_regex(regex)?;
     }
     Ok(updater)
   }
@@ -164,6 +176,33 @@ mod tests {
     let version = Version::new(1, 2, 3);
     let new_version = updater.increment(&version, commits);
     assert_eq!(new_version, Version::new(1, 2, 4));
+  }
+
+  #[test]
+  fn version_updater_with_no_increment_regex() {
+    let config = UpdateConfig {
+      no_increment_regex: Some("chore|wip".to_string()),
+      ..Default::default()
+    };
+    let updater = config.version_updater().unwrap();
+    let version = Version::new(1, 2, 3);
+    // A `chore` commit matches no_increment_regex → no version change.
+    assert_eq!(updater.increment(&version, ["chore: tidy up"]), version);
+  }
+
+  #[test]
+  fn version_updater_breaking_always_increment_major_on_zerover() {
+    let config = UpdateConfig {
+      breaking_always_increment_major: true,
+      ..Default::default()
+    };
+    let updater = config.version_updater().unwrap();
+    let version = Version::new(0, 1, 0);
+    // With breaking_always_increment_major, a breaking change bumps major even on 0.x.
+    assert_eq!(
+      updater.increment(&version, ["feat!: breaking change"]),
+      Version::new(1, 0, 0)
+    );
   }
 
   #[test]
