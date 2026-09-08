@@ -1,0 +1,17 @@
+[package]
+name = "next_version"
+version = "0.0.1"
+edition.workspace = true
+description = "Determine next semantic version based on conventional commits"
+license.workspace = true
+repository = "https://github.com/zen-rust/release/tree/main/packages/next_version"
+keywords = ["semver", "semantic", "versioning", "conventional", "commits"]
+categories = ["development-tools", "parsing"]
+
+[lints]
+workspace = true
+
+[dependencies]
+regex.workspace = true
+semver.workspace = true
+git-conventional.workspace = true

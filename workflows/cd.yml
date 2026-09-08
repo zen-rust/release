@@ -1,0 +1,125 @@
+name: CD # Continuous Deployment
+
+on:
+  release:
+    types: [published]
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: -D warnings
+  RUSTUP_MAX_RETRIES: 10
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  upload-assets:
+    name: ${{ matrix.target }}
+    permissions:
+      contents: write # to upload release assets
+    if: github.repository_owner == 'zen-rust' && startsWith(github.event.release.name, 'zen-release-v')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Run all jobs to completion regardless of errors.
+      # This is useful because sometimes we fail to compile for a certain target.
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-pc-windows-msvc
+            os: windows-2022
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+          - target: x86_64-pc-windows-msvc
+            os: windows-2022
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-22.04
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-22.04
+          - target: aarch64-apple-darwin
+            os: macos-14
+          - target: x86_64-unknown-freebsd
+            os: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Don't cache when uploading artifacts for security.
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          cache: false
+      - uses: taiki-e/setup-cross-toolchain-action@12b7ad4acfa95a1476779d6c06699b96ec1691f8 # v1.42.0
+        with:
+          target: ${{ matrix.target }}
+        if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, '-musl')
+      - uses: taiki-e/install-action@d438492cf8a250514fa2d34b30bc3c0dc37c65ff # v2.87.8
+        with:
+          tool: cross
+        if: contains(matrix.target, '-musl')
+      - run: echo "RUSTFLAGS=${RUSTFLAGS} -C target-feature=+crt-static" >> "${GITHUB_ENV}"
+        if: endsWith(matrix.target, 'windows-msvc')
+      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
+        with:
+          bin: zen-release
+          target: ${{ matrix.target }}
+          tar: all
+          zip: windows
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  draft-announcement:
+    name: Draft social media announcement
+    needs: upload-assets
+    if: github.repository_owner == 'zen-rust' && startsWith(github.event.release.name, 'zen-release-v')
+    runs-on: ubuntu-24.04
+    environment: announce
+    steps:
+      # We use typefully to cross-post the release announcement
+      # to zen-release social media accounts.
+      # This job prepares the announcement draft. Marco needs to login to
+      # typefully to do manual edits (if required) and send the announcement.
+      - name: Draft announcement
+        env:
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          TYPEFULLY_API_KEY: ${{ secrets.TYPEFULLY_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          # Typefully v2 API expects explicit per-platform payloads.
+          long_text=$(printf '🤖 New release: %s\n\n%s\n' "$RELEASE_NAME" "$RELEASE_BODY")
+
+          payload=$(jq -n \
+            --arg long_text "$long_text" \
+            '{
+              platforms: {
+                x: { enabled: true, posts: [{ text: $long_text }] },
+                linkedin: { enabled: true, posts: [{ text: $long_text }] },
+                mastodon: { enabled: true, posts: [{ text: $long_text }] },
+                bluesky: { enabled: true, posts: [{ text: $long_text }] }
+              }
+            }')
+
+          response=$(curl -sS --fail \
+            --request POST "https://api.typefully.com/v2/social-sets/201880/drafts" \
+            --header 'Content-Type: application/json' \
+            --header "Authorization: Bearer ${TYPEFULLY_API_KEY}" \
+            --data "$payload")
+
+          draft_id=$(printf '%s' "$response" | jq -r '.id // empty')
+
+          echo "Typefully draft created: id=${draft_id}"

@@ -1,0 +1,38 @@
+services:
+  # We use Gitea as a git server.
+  # We test that zen-release can open PRs, create releases, etc.
+  gitea:
+    image: docker.io/gitea/gitea:1.27.3-rootless
+    container_name: gitea
+    restart: always
+    environment:
+      - GITEA__security__INSTALL_LOCK=true
+      - GITEA__database__DB_TYPE=postgres
+      - GITEA__database__HOST=db:5432
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=gitea
+      - GITEA__database__PASSWD=gitea
+    ports:
+      - "3000:3000"
+      - "2222:2222"
+    healthcheck:
+      test: curl http://localhost:3000
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      - db
+  # We use postgres as a database for Gitea.
+  # With SqlLite I had problems related to database locks.
+  db:
+    image: docker.io/library/postgres:18
+    restart: always
+    environment:
+      - POSTGRES_USER=gitea
+      - POSTGRES_PASSWORD=gitea
+      - POSTGRES_DB=gitea
+    healthcheck:
+      test: pg_isready -U gitea
+      interval: 5s
+      timeout: 5s
+      retries: 10
