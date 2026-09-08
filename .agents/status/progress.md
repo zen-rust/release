@@ -42,12 +42,12 @@
 ## Phase 2 sub-tasks
 
 - [x] `Manifest::set_dependencies_registry(internal_deps, registry)` + `strip_dependencies_registry(internal_deps)` in `cargo_utils/src/manifest.rs`: adds/removes `registry = "…"` across normal/dev/build, `target.*`, and `[workspace.dependencies]`; expands bare version strings; skips `workspace = true` entries; matches renamed deps by `package`. 4 unit tests, gate-green.
-- [ ] Wire into the publish temp-copy path: apply `set_dependencies_registry` before publishing to the primary registry when `self_contained = true`; use workspace member names as `internal_deps`.
-- [ ] Thread primary registry (name + self_contained) from config into `ReleaseRequest`.
+- [x] Thread primary registry (name + `self_contained`) from config into `ReleaseRequest`: `self_contained` field + `with_self_contained()`/`is_self_contained()` on `ReleaseRequest`; `fill_release_config` reads the first `[[registry]]` → sets registry + self_contained. Inert unless a `[[registry]]` is configured. Gate-green.
+- [ ] **DEFERRED (needs integration test / morning review):** apply `set_dependencies_registry` on the hot publish path. `release` publishes in-place from the CI-ephemeral checkout (`release.rs:572`, not a temp copy), so application means transiently rewriting `package.manifest_path`, forcing `--allow-dirty`, publishing, then restoring — a delicate change on the real publish path that the docker/integration suite (unavailable in this session) must verify. `is_self_contained()` is the hook.
 
 ## Current focus
 
-→ **Phase 2**: self-containment transform **done & gate-green** (pure, tested). Next: thread primary registry from config into `ReleaseRequest` and apply the rewrite in the temp copy before publish. Then Phase 3 (mirror + batching).
+→ **Phase 2**: transform + plumbing **done & gate-green**. The publish-path *application* is deferred (see above — risky, needs integration verification). Pivoting the loop to **Phase 4 (bump defaults)** — fully unit-testable, low-risk. Phase 3 (mirror + batching) also touches the publish path → queued with the Phase 2 application for morning.
 
 ## Open questions / blockers
 
