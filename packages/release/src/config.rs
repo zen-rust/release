@@ -801,6 +801,73 @@ mod tests {
     assert_eq!(config, expected_config);
   }
 
+  #[test]
+  fn project_and_registries_round_trip() {
+    let toml_str = r#"
+      [project]
+      packages_dir = "packages"
+      lockstep = true
+      tag_format = "v{{ version }}"
+
+      [[registry]]
+      name = "primary"
+      kind = "kellnr"
+      index = "sparse+https://crates.example.org/api/v1/crates/"
+      token = "env:CARGO_REGISTRIES_PRIMARY_TOKEN"
+      self_contained = true
+
+      [[registry]]
+      name = "crates-io"
+      kind = "crates-io"
+      token = "env:CARGO_REGISTRY_TOKEN"
+      strip_alt_registry = true
+      batch_size = 18
+      batch_gap_secs = 3600
+      retry_on_429 = true
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    config.validate_registries().unwrap();
+
+    let project = config.project.as_ref().unwrap();
+    assert_eq!(project.packages_dir.as_deref(), Some("packages"));
+    assert_eq!(project.lockstep, Some(true));
+    assert_eq!(project.tag_format.as_deref(), Some("v{{ version }}"));
+
+    assert_eq!(config.registry.len(), 2);
+    let primary = &config.registry[0];
+    assert_eq!(primary.name, "primary");
+    assert_eq!(primary.kind, RegistryKind::Kellnr);
+    assert_eq!(primary.self_contained, Some(true));
+
+    let mirror = &config.registry[1];
+    assert_eq!(mirror.name, "crates-io");
+    assert_eq!(mirror.kind, RegistryKind::CratesIo);
+    assert_eq!(mirror.strip_alt_registry, Some(true));
+    assert_eq!(mirror.batch_size, Some(18));
+    assert_eq!(mirror.batch_gap_secs, Some(3600));
+    assert_eq!(mirror.retry_on_429, Some(true));
+
+    // Round-trip: re-serialize and re-parse yields the same config.
+    let reserialized = toml::to_string(&config).unwrap();
+    let reparsed: Config = toml::from_str(&reserialized).unwrap();
+    assert_eq!(config, reparsed);
+  }
+
+  #[test]
+  fn duplicate_registry_names_are_rejected() {
+    let toml_str = r#"
+      [[registry]]
+      name = "dup"
+
+      [[registry]]
+      name = "dup"
+    "#;
+    let config: Config = toml::from_str(toml_str).unwrap();
+    let err = config.validate_registries().unwrap_err().to_string();
+    assert!(err.contains("duplicate registry name"), "got: {err}");
+  }
+
   fn config_package_release_is_deserialized(config_flag: &str, expected_value: bool) {
     let config = &format!(
       "{BASE_WORKSPACE_CONFIG}\n{BASE_PACKAGE_CONFIG}\
