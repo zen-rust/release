@@ -1,6 +1,38 @@
 use zen_release_core::fs_utils::Utf8TempDir;
 
+use crate::helpers::package::{PackageType, TestPackage};
 use crate::helpers::test_context::TestContext;
+
+/// With `self_contained = true`, a workspace binary's dependency on an internal library is
+/// rewritten to `registry = "<primary>"` before publishing. Publishing the binary then only
+/// succeeds if that dependency resolves from the registry, so a green release exercises the
+/// whole self-contained publish path (rewrite → dependency-ordered publish → registry resolve).
+#[tokio::test]
+#[cfg_attr(not(feature = "docker-tests"), ignore)]
+async fn release_self_contained_publishes_workspace_to_registry() {
+  let binary = "binary";
+  let library = "library";
+  let context = TestContext::new_workspace_with_packages(&[
+    TestPackage::new(binary)
+      .with_type(PackageType::Bin)
+      .with_path_dependencies(vec![format!("../{library}")]),
+    TestPackage::new(library).with_type(PackageType::Lib),
+  ])
+  .await;
+
+  context.write_release_toml(
+    r#"
+[[registry]]
+name = "test-registry"
+kind = "sparse"
+self_contained = true
+"#,
+  );
+
+  context.run_release_pr().success();
+  context.merge_release_pr().await;
+  context.run_release().success();
+}
 
 #[tokio::test]
 #[cfg_attr(not(feature = "docker-tests"), ignore)]
