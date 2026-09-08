@@ -8,8 +8,9 @@
 ## Gate status
 
 - `cargo check --workspace --all-targets` (stable 1.98.1): **GREEN** ✅
-- fmt + clippy `--all-features -D warnings`: **GREEN** ✅ (after Phase 1 config)
-- Tests: config unit tests **GREEN**; full test suite (incl. `docker-tests`) not yet run this session
+- fmt + clippy `--all-features -D warnings`: **GREEN** ✅
+- **Full integration suite (docker-tests, on user's Mac): GREEN ✅ (2026-09-08)** — after `cargo install cargo-semver-checks` and fixing the fixture config rename. No regressions from the rename or Phases 1/2/4.
+- Caveat: no existing test *exercises* self-containment or the mirror (no fixture enables a `[[registry]]`), so those new paths are green-by-inertness, not behavior-verified. Add fixtures when wiring Phase 3.
 - Toolchain: stable 1.98.1 (deps require ≥1.96); nightly 1.96 also available.
 
 ## Done (this session)
