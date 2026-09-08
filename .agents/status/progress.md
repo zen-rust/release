@@ -27,7 +27,7 @@
 | 1 | Config model: `[project]` + `[[registry]]` array | critical-path | ✅ done (gate-green) |
 | 2 | Self-containment: rewrite internal deps to `registry = "…"` | critical-path | ◐ in progress |
 | 3 | crates.io mirror + rate-safe batching + 429 retry | critical-path | ☐ not started |
-| 4 | Bump defaults (Jetstream ruleset) + tag-baseline default | important | ☐ not started |
+| 4 | Bump defaults (Jetstream ruleset) + tag-baseline default | important | ◐ knobs+config done; tag-baseline deferred |
 | 5 | Whole-repo release PR + opt-in flag (default false) | secondary | ☐ not started |
 | 6 | Monorepo subtree config (`packages_dir`) | low | ☐ not started |
 
@@ -45,9 +45,28 @@
 - [x] Thread primary registry (name + `self_contained`) from config into `ReleaseRequest`: `self_contained` field + `with_self_contained()`/`is_self_contained()` on `ReleaseRequest`; `fill_release_config` reads the first `[[registry]]` → sets registry + self_contained. Inert unless a `[[registry]]` is configured. Gate-green.
 - [ ] **DEFERRED (needs integration test / morning review):** apply `set_dependencies_registry` on the hot publish path. `release` publishes in-place from the CI-ephemeral checkout (`release.rs:572`, not a temp copy), so application means transiently rewriting `package.manifest_path`, forcing `--allow-dirty`, publishing, then restoring — a delicate change on the real publish path that the docker/integration suite (unavailable in this session) must verify. `is_self_contained()` is the hook.
 
+## Phase 4 sub-tasks
+
+- [x] Plumb `breaking_always_increment_major` + `no_increment_regex` through `PackageConfig` → `UpdateConfig` → `VersionUpdater::version_updater()` (`update_config.rs`, `config.rs`). 2 behavior tests; schema regenerated; gate-green.
+- [x] Jetstream rules in this repo's `zen-release.toml`: `no_increment_regex = "^(wip|chore)"`. `^breaking`→major intentionally omitted to stay pre-1.0.
+- [ ] **DEFERRED (engine design):** make tag-based baseline the default for a *publishing* project. Current `git_only` mode uses git tags but also disables publishing (`git_only` and `publish` are mutually exclusive, `config.rs:240`); registry mode reads the baseline from a registry. A "tag baseline + still publish" mode needs decoupling the baseline source from the publish toggle in `next_ver.rs`/`updater.rs`. Not blocking the publish critical path.
+- [ ] Scope-based `none` rules (`feat(style):`/`feat(test):`) — not expressible via a type regex; future enhancement.
+
 ## Current focus
 
-→ **Phase 2**: transform + plumbing **done & gate-green**. The publish-path *application* is deferred (see above — risky, needs integration verification). Pivoting the loop to **Phase 4 (bump defaults)** — fully unit-testable, low-risk. Phase 3 (mirror + batching) also touches the publish path → queued with the Phase 2 application for morning.
+→ **Phases 1, 2 (transform+plumbing), 4 (knobs+config) are done & gate-green.** Remaining critical-path work touches the **hot publish path** and needs the docker/integration suite (unavailable here) + a couple of design calls — see "Remaining / morning" below. Next safe loop target: **Phase 6 (packages_dir subtree config)**.
+
+## Remaining / morning review
+
+Ranked; the first two are the critical path but need integration verification:
+
+1. **Phase 2 application** — apply `Manifest::set_dependencies_registry` on the publish path (hook: `ReleaseRequest::is_self_contained()`). Design: `release` publishes in-place from the CI checkout, so transiently rewrite `package.manifest_path` + force `--allow-dirty` + restore, OR switch self-contained publishes to a temp copy. Needs integration test.
+2. **Phase 3 — crates.io mirror + batching** — mirror step for `kind = crates-io`: strip registry markers (`strip_dependencies_registry`, done), publish dependency-ordered in `batch_size` batches with `batch_gap_secs`, 429 defer/retry, idempotent skip. Touches the publish loop (`release.rs:626`). Needs integration test.
+3. **Phase 4 tag-baseline default** — engine change (decouple baseline from publish mode).
+4. **Phase 5** — whole-repo PR + opt-in flag (default false).
+5. **Phase 6** — `packages_dir` subtree scoping.
+
+Decisions to confirm in the morning: (a) Phase 2 in-place-restore vs temp-copy; (b) mirror placement inline vs webhook (AGENTS.md open #2); (c) whether to enable `^breaking`→major / `features_always_increment_minor` for this repo (kept off to stay <1.0).
 
 ## Open questions / blockers
 
