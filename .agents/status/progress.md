@@ -39,9 +39,15 @@
 - [ ] Thread registries into the publish flow (`ReleaseRequest` at `release.rs:37` is single `registry`/`token`) → primary + mirror list. (Overlaps Phase 2/3 wiring.)
 - [ ] Add a round-trip parse test for a primary + mirror `zen-release.toml`.
 
+## Phase 2 sub-tasks
+
+- [x] `Manifest::set_dependencies_registry(internal_deps, registry)` + `strip_dependencies_registry(internal_deps)` in `cargo_utils/src/manifest.rs`: adds/removes `registry = "…"` across normal/dev/build, `target.*`, and `[workspace.dependencies]`; expands bare version strings; skips `workspace = true` entries; matches renamed deps by `package`. 4 unit tests, gate-green.
+- [ ] Wire into the publish temp-copy path: apply `set_dependencies_registry` before publishing to the primary registry when `self_contained = true`; use workspace member names as `internal_deps`.
+- [ ] Thread primary registry (name + self_contained) from config into `ReleaseRequest`.
+
 ## Current focus
 
-→ **Phase 1** config structs + validation + schema **done & gate-green**. Next: add round-trip test, then Phase 2 (self-containment). Proceeding with the proposed `[[registry]]` shape — user started the build loop; shape recorded in `decisions/decisions.md`.
+→ **Phase 2**: self-containment transform **done & gate-green** (pure, tested). Next: thread primary registry from config into `ReleaseRequest` and apply the rewrite in the temp copy before publish. Then Phase 3 (mirror + batching).
 
 ## Open questions / blockers
 
