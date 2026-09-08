@@ -894,6 +894,46 @@ mod tests {
   }
 
   #[test]
+  fn registries_configure_self_contained_and_mirrors() {
+    let config: Config = toml::from_str(
+      r#"
+      [[registry]]
+      name = "primary"
+      kind = "kellnr"
+      self_contained = true
+
+      [[registry]]
+      name = "crates-io"
+      kind = "crates-io"
+      strip_alt_registry = true
+      batch_size = 18
+      batch_gap_secs = 3600
+      retry_on_429 = true
+      "#,
+    )
+    .unwrap();
+
+    let request = config
+      .fill_release_config(
+        false,
+        false,
+        ReleaseRequest::new(fake_package::metadata::fake_metadata()),
+      )
+      .unwrap();
+
+    assert_eq!(request.registry_name(), Some("primary"));
+    assert!(request.is_self_contained());
+
+    let mirrors = request.mirrors();
+    assert_eq!(mirrors.len(), 1);
+    assert_eq!(mirrors[0].name, "crates-io");
+    assert!(mirrors[0].strip_alt_registry);
+    assert_eq!(mirrors[0].batch_size, 18);
+    assert_eq!(mirrors[0].batch_gap_secs, 3600);
+    assert!(mirrors[0].retry_on_429);
+  }
+
+  #[test]
   fn duplicate_registry_names_are_rejected() {
     let toml_str = r#"
       [[registry]]
