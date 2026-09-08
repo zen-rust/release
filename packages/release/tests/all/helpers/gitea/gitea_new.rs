@@ -27,6 +27,36 @@ impl GiteaContext {
   }
 }
 
+/// A standalone cargo registry backed by its own gitea user, for testing mirror publishing.
+pub struct CargoRegistryHandle {
+  /// Cargo registry name used in config (e.g. "mirror").
+  pub name: String,
+  /// The gitea user's publish token.
+  pub token: String,
+  /// The registry index (git) URL.
+  pub index_url: String,
+}
+
+/// Provision a new cargo registry in gitea: a fresh user, its `_cargo-index` repo, and the
+/// registry config. Returns a handle with the name, token, and index URL.
+pub async fn create_cargo_registry(name: &str) -> CargoRegistryHandle {
+  let client = reqwest::Client::new();
+  let user = create_user();
+  let token = create_token(&user, &client).await;
+  create_repository(&token, CARGO_INDEX_REPO, &client).await;
+  upload_registry_config(&token, &user.username, &client).await;
+  let index_url = format!(
+    "http://{}/{}/{CARGO_INDEX_REPO}.git",
+    super::gitea_address(),
+    user.username
+  );
+  CargoRegistryHandle {
+    name: name.to_string(),
+    token,
+    index_url,
+  }
+}
+
 pub async fn create_token(user: &GiteaUser, client: &reqwest::Client) -> String {
   #[derive(serde::Deserialize)]
   struct Token {

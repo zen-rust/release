@@ -19,7 +19,7 @@ use tracing::info;
 
 use super::{
   TEST_REGISTRY, fake_utils,
-  gitea::{GiteaContext, gitea_address},
+  gitea::{CargoRegistryHandle, GiteaContext, create_cargo_registry, gitea_address},
   package::TestPackage,
 };
 
@@ -217,11 +217,23 @@ impl TestContext {
   }
 
   pub fn run_release(&self) -> Assert {
+    self.run_release_with_registries(&[])
+  }
+
+  /// Like [`run_release`], but also provides publish tokens for the given extra registries
+  /// (used to exercise mirror publishing to a second registry).
+  pub fn run_release_with_registries(&self, extra: &[&CargoRegistryHandle]) -> Assert {
     let token_env_var = cargo_registries_token_env_var_name(TEST_REGISTRY).unwrap();
-    super::cmd::release_cmd(&self.cargo_target_dir())
+    let mut cmd = super::cmd::release_cmd(&self.cargo_target_dir());
+    cmd
       .current_dir(self.repo_dir())
       .env(ZEN_RELEASE_LOG, log_level())
-      .env(token_env_var, format!("Bearer {}", self.gitea.token))
+      .env(token_env_var, format!("Bearer {}", self.gitea.token));
+    for handle in extra {
+      let env = cargo_registries_token_env_var_name(&handle.name).unwrap();
+      cmd.env(env, format!("Bearer {}", handle.token));
+    }
+    cmd
       .arg("release")
       .arg("--verbose")
       .arg("--git-token")
@@ -234,6 +246,21 @@ impl TestContext {
       .arg("json")
       .timeout(Duration::from_secs(300))
       .assert()
+  }
+
+  /// Provision a second cargo registry in gitea and register it in the repo's cargo config,
+  /// so releases can mirror-publish to it. Returns a handle carrying its name and token.
+  pub async fn add_cargo_registry(&self, name: &str) -> CargoRegistryHandle {
+    let handle = create_cargo_registry(name).await;
+    let config_file = self.repo_dir().join(".cargo").join("config.toml");
+    let mut config = fs_err::read_to_string(&config_file).unwrap();
+    config.push_str(&format!(
+      "\n[registries.{}]\nindex = \"{}\"\n",
+      handle.name, handle.index_url
+    ));
+    fs_err::write(&config_file, config).unwrap();
+    self.push_all_changes(&format!("add {} registry to cargo config", handle.name));
+    handle
   }
 
   pub fn repo_dir(&self) -> Utf8PathBuf {

@@ -34,6 +34,46 @@ self_contained = true
   context.run_release().success();
 }
 
+/// With a primary (self-contained) registry plus a mirror registry configured, a release
+/// publishes to the primary and then mirrors to the second registry — stripping internal-dep
+/// registry markers back to plain for the mirror form. A green release proves the whole mirror
+/// path end-to-end (strip → dependency-ordered publish to the second registry).
+#[tokio::test]
+#[cfg_attr(not(feature = "docker-tests"), ignore)]
+async fn release_mirrors_workspace_to_second_registry() {
+  let binary = "binary";
+  let library = "library";
+  let context = TestContext::new_workspace_with_packages(&[
+    TestPackage::new(binary)
+      .with_type(PackageType::Bin)
+      .with_path_dependencies(vec![format!("../{library}")]),
+    TestPackage::new(library).with_type(PackageType::Lib),
+  ])
+  .await;
+
+  let mirror = context.add_cargo_registry("mirror").await;
+
+  context.write_release_toml(
+    r#"
+[[registry]]
+name = "test-registry"
+kind = "sparse"
+self_contained = true
+
+[[registry]]
+name = "mirror"
+kind = "crates-io"
+strip_alt_registry = true
+"#,
+  );
+
+  context.run_release_pr().success();
+  context.merge_release_pr().await;
+  // Publishes to the primary (self-contained) and mirrors to `mirror` (stripped). If either
+  // the strip or the second-registry publish is wrong, this release fails.
+  context.run_release_with_registries(&[&mirror]).success();
+}
+
 #[tokio::test]
 #[cfg_attr(not(feature = "docker-tests"), ignore)]
 async fn release_info_contains_prs_in_changelog() {

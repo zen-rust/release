@@ -1,6 +1,8 @@
 mod gitea_client;
 mod gitea_new;
 
+pub use gitea_new::{CargoRegistryHandle, create_cargo_registry};
+
 #[derive(Debug)]
 pub struct GiteaUser {
   username: String,
