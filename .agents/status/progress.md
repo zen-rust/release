@@ -30,7 +30,7 @@
 | # | Phase | Priority | Status |
 |---|---|---|---|
 | 1 | Config model: `[project]` + `[[registry]]` array | critical-path | ✅ done (gate-green) |
-| 2 | Self-containment: rewrite internal deps to `registry = "…"` | critical-path | ◐ implemented (unit-green); Docker integration pending |
+| 2 | Self-containment: rewrite internal deps to `registry = "…"` | critical-path | ✅ done — **e2e verified** (real gitea publish, 2026-09-08) |
 | 3 | crates.io mirror + rate-safe batching + 429 retry | critical-path | ◐ implemented + config-wired (unit-green); two-registry e2e needs infra |
 | 4 | Bump defaults (Jetstream ruleset) + tag-baseline default | important | ◐ knobs+config done; tag-baseline deferred |
 | 5 | Whole-repo release PR + opt-in flag (default false) | secondary | ☐ not started |
