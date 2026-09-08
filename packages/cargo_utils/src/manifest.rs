@@ -74,6 +74,24 @@ impl Manifest {
     });
   }
 
+  /// Set `[package] publish` to allow exactly the given registries.
+  ///
+  /// Needed when mirror-publishing a crate whose `publish` field restricts it to another
+  /// registry: cargo refuses to publish to a registry not listed there.
+  pub fn set_publish_registries(&mut self, registries: &[&str]) {
+    let mut array = toml_edit::Array::new();
+    for registry in registries {
+      array.push(*registry);
+    }
+    if let Some(package) = self
+      .data
+      .get_mut("package")
+      .and_then(toml_edit::Item::as_table_like_mut)
+    {
+      package.insert("publish", toml_edit::value(array));
+    }
+  }
+
   /// Invoke `f` for every dependency table in the manifest: the standard
   /// `[dependencies]`/`[dev-dependencies]`/`[build-dependencies]`, their
   /// `[target.<t>.*]` variants, and `[workspace.dependencies]`.
@@ -275,6 +293,21 @@ core = { path = "core", version = "0.0.1" }
     assert!(get(core, "registry").is_none());
     // The rest of the dependency is preserved.
     assert_eq!(get(core, "version").unwrap().as_str(), Some("0.0.1"));
+  }
+
+  #[test]
+  fn set_publish_registries_overwrites_publish_field() {
+    let input = "[package]\nname = \"app\"\npublish = [\"primary\"]\n";
+    let mut m: Manifest = input.parse().unwrap();
+    m.set_publish_registries(&["mirror"]);
+    let publish = get(m.data.get("package").unwrap(), "publish").unwrap();
+    let values: Vec<&str> = publish
+      .as_array()
+      .unwrap()
+      .iter()
+      .filter_map(toml_edit::Value::as_str)
+      .collect();
+    assert_eq!(values, vec!["mirror"]);
   }
 
   #[test]

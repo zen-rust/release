@@ -738,24 +738,24 @@ async fn publish_to_mirrors(input: &ReleaseRequest, packages: &[&Package]) -> an
       mirror.name
     );
 
-    // Produce the crates.io-compatible (plain-deps) manifest form, restored on scope exit.
-    let _strip_guard = if mirror.strip_alt_registry {
-      let manifest_paths: Vec<&Utf8Path> =
-        packages.iter().map(|p| p.manifest_path.as_path()).collect();
-      let internal_deps: HashSet<&str> = packages.iter().map(|p| p.name.as_str()).collect();
-      let backup = crate::self_contained::ManifestBackup::capture(&manifest_paths)?;
-      for path in &manifest_paths {
-        let mut manifest = cargo_utils::LocalManifest::try_new(path)
-          .with_context(|| format!("failed to open manifest {path}"))?;
+    // Produce the mirror manifest form (optionally strip alt-registry deps to plain, and
+    // allow publishing to the mirror even if `publish` restricts the crate), restored on
+    // scope exit by the backup guard.
+    let manifest_paths: Vec<&Utf8Path> =
+      packages.iter().map(|p| p.manifest_path.as_path()).collect();
+    let internal_deps: HashSet<&str> = packages.iter().map(|p| p.name.as_str()).collect();
+    let _mirror_manifest_guard = crate::self_contained::ManifestBackup::capture(&manifest_paths)?;
+    for path in &manifest_paths {
+      let mut manifest = cargo_utils::LocalManifest::try_new(path)
+        .with_context(|| format!("failed to open manifest {path}"))?;
+      if mirror.strip_alt_registry {
         manifest.strip_dependencies_registry(&internal_deps);
-        manifest
-          .write()
-          .with_context(|| format!("failed to write manifest {path}"))?;
       }
-      Some(backup)
-    } else {
-      None
-    };
+      manifest.set_publish_registries(&[&mirror.name]);
+      manifest
+        .write()
+        .with_context(|| format!("failed to write manifest {path}"))?;
+    }
 
     let registry = Some(mirror.name.as_str());
     let token = input.find_registry_token(registry)?;
