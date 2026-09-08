@@ -212,6 +212,15 @@ impl Config {
     }
     let mut release_request = release_request.with_default_package_config(default_config.into());
 
+    // Registry-driven config: the primary registry (first `[[registry]]`) sets the publish
+    // target and whether internal deps are rewritten to a self-contained form.
+    if let Some(primary) = self.registry.first() {
+      release_request = release_request.with_registry(primary.name.clone());
+      if primary.self_contained == Some(true) {
+        release_request = release_request.with_self_contained(true);
+      }
+    }
+
     for (package, config) in self.packages() {
       let mut release_config = config.clone();
       release_config = release_config.merge(self.workspace.packages_defaults.clone());
@@ -1012,7 +1021,7 @@ mod tests {
               |
             1 | [unknown]
               |  ^^^^^^^
-            unknown field `unknown`, expected one of `workspace`, `changelog`, `package`
+            unknown field `unknown`, expected one of `project`, `registry`, `workspace`, `changelog`, `package`
         "]]
     .assert_eq(&error);
   }

@@ -54,6 +54,9 @@ pub struct ReleaseRequest {
   publish_timeout: Duration,
   /// PR Branch Prefix
   branch_prefix: String,
+  /// If true, rewrite internal (workspace) dependencies to `registry = "<registry>"`
+  /// before publishing, so the published crates are self-contained on that registry.
+  self_contained: bool,
 }
 
 impl ReleaseRequest {
@@ -70,6 +73,7 @@ impl ReleaseRequest {
       publish_timeout: minutes_30,
       release_always: true,
       branch_prefix: DEFAULT_BRANCH_PREFIX.to_string(),
+      self_contained: false,
     }
   }
 
@@ -81,6 +85,18 @@ impl ReleaseRequest {
   pub fn with_registry(mut self, registry: impl Into<String>) -> Self {
     self.registry = Some(registry.into());
     self
+  }
+
+  /// Enable self-contained publishing: internal deps are rewritten to
+  /// `registry = "<registry>"` before publishing. Requires [`with_registry`].
+  pub fn with_self_contained(mut self, self_contained: bool) -> Self {
+    self.self_contained = self_contained;
+    self
+  }
+
+  /// Whether self-contained publishing (internal-dep registry rewrite) is enabled.
+  pub fn is_self_contained(&self) -> bool {
+    self.self_contained
   }
 
   pub fn with_token(mut self, token: impl Into<SecretString>) -> Self {
