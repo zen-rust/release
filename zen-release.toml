@@ -2,6 +2,14 @@
 git_release_enable = false
 dependencies_update = false # TODO: re-enable when `cargo update` works in this project
 
+# Jetstream Labs conventional-commit rules (see AGENTS.md "Default conventional-commit rules").
+# `wip` and `chore` commits do not trigger a release.
+no_increment_regex = "^(wip|chore)"
+# NOTE: `custom_major_increment_regex = "^breaking"` (breaking -> major) is intentionally
+# omitted while zen-release is pre-1.0, so releases stay under 1.0. Enable it at 1.x.
+# (Scope-based `none` rules — feat(style):/feat(test): — are not expressible via a type regex
+# yet; tracked as a future enhancement.)
+
 git_release_body = """
 {{ changelog }}
 {% if remote.contributors %}
