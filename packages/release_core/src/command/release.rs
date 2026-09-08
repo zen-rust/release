@@ -26,6 +26,22 @@ use crate::{
   pr_parser::{Pr, prs_from_text},
 };
 
+/// A mirror registry to publish to after the primary registry (typically crates.io).
+#[derive(Debug, Clone)]
+pub struct MirrorRegistry {
+  /// Cargo registry name (`crates-io` for the public registry).
+  pub name: String,
+  /// Strip alternative-registry markers from internal deps before publishing here
+  /// (required for crates.io, which forbids alt-registry deps).
+  pub strip_alt_registry: bool,
+  /// Publish in batches of at most this many crates (0 = no batching).
+  pub batch_size: usize,
+  /// Seconds to wait between batches, to stay under registry rate limits.
+  pub batch_gap_secs: u64,
+  /// Retry/defer publishing on HTTP 429 (rate limited) responses.
+  pub retry_on_429: bool,
+}
+
 #[derive(Debug)]
 pub struct ReleaseRequest {
   /// Cargo metadata.
@@ -57,6 +73,8 @@ pub struct ReleaseRequest {
   /// If true, rewrite internal (workspace) dependencies to `registry = "<registry>"`
   /// before publishing, so the published crates are self-contained on that registry.
   self_contained: bool,
+  /// Mirror registries to publish to after the primary registry (e.g. crates.io).
+  mirrors: Vec<MirrorRegistry>,
 }
 
 impl ReleaseRequest {
@@ -74,6 +92,7 @@ impl ReleaseRequest {
       release_always: true,
       branch_prefix: DEFAULT_BRANCH_PREFIX.to_string(),
       self_contained: false,
+      mirrors: Vec::new(),
     }
   }
 
@@ -102,6 +121,17 @@ impl ReleaseRequest {
   /// The configured registry name, if any.
   pub fn registry_name(&self) -> Option<&str> {
     self.registry.as_deref()
+  }
+
+  /// Configure mirror registries to publish to after the primary registry.
+  pub fn with_mirrors(mut self, mirrors: Vec<MirrorRegistry>) -> Self {
+    self.mirrors = mirrors;
+    self
+  }
+
+  /// The configured mirror registries.
+  pub fn mirrors(&self) -> &[MirrorRegistry] {
+    &self.mirrors
   }
 
   pub fn with_token(mut self, token: impl Into<SecretString>) -> Self {
@@ -661,7 +691,7 @@ async fn release_packages(
   let mut package_releases: Vec<PackageRelease> = vec![];
   // The same trusted publishing token can be used for all packages.
   let mut trusted_publishing_client: Option<trusted_publishing::TrustedPublisher> = None;
-  for package in packages {
+  for &package in &packages {
     if let Some(pkg_release) = release_package_if_needed(
       input,
       project,
@@ -680,10 +710,162 @@ async fn release_packages(
   {
     warn!("Failed to revoke trusted publishing token: {e:?}");
   }
+
+  // Mirror pass: after the primary publish, mirror to each configured registry (e.g.
+  // crates.io) — stripped to plain deps, in rate-safe batches, idempotently.
+  if !input.mirrors().is_empty() && !packages.is_empty() {
+    publish_to_mirrors(input, &packages)
+      .await
+      .context("failed to publish to mirror registry")?;
+  }
+
   let release = (!package_releases.is_empty()).then_some(Release {
     releases: package_releases,
   });
   Ok(release)
+}
+
+/// Publish the given packages to each configured mirror registry (typically crates.io),
+/// after the primary publish. For each mirror: optionally strip alternative-registry
+/// markers from internal deps (restored afterward), then publish in rate-safe batches,
+/// skipping versions already present and backing off on rate limits.
+async fn publish_to_mirrors(input: &ReleaseRequest, packages: &[&Package]) -> anyhow::Result<()> {
+  let workspace_root = &input.metadata.workspace_root;
+  for mirror in input.mirrors() {
+    info!(
+      "mirroring {} package(s) to registry `{}`",
+      packages.len(),
+      mirror.name
+    );
+
+    // Produce the crates.io-compatible (plain-deps) manifest form, restored on scope exit.
+    let _strip_guard = if mirror.strip_alt_registry {
+      let manifest_paths: Vec<&Utf8Path> =
+        packages.iter().map(|p| p.manifest_path.as_path()).collect();
+      let internal_deps: HashSet<&str> = packages.iter().map(|p| p.name.as_str()).collect();
+      let backup = crate::self_contained::ManifestBackup::capture(&manifest_paths)?;
+      for path in &manifest_paths {
+        let mut manifest = cargo_utils::LocalManifest::try_new(path)
+          .with_context(|| format!("failed to open manifest {path}"))?;
+        manifest.strip_dependencies_registry(&internal_deps);
+        manifest
+          .write()
+          .with_context(|| format!("failed to write manifest {path}"))?;
+      }
+      Some(backup)
+    } else {
+      None
+    };
+
+    let registry = Some(mirror.name.as_str());
+    let token = input.find_registry_token(registry)?;
+
+    let batches = crate::into_batches(packages.to_vec(), mirror.batch_size);
+    for (batch_index, batch) in batches.iter().enumerate() {
+      if batch_index > 0 && mirror.batch_gap_secs > 0 {
+        info!(
+          "waiting {}s before next mirror batch",
+          mirror.batch_gap_secs
+        );
+        tokio::time::sleep(Duration::from_secs(mirror.batch_gap_secs)).await;
+      }
+      for &package in batch {
+        mirror_publish_package(input, package, workspace_root, registry, &token, mirror).await?;
+      }
+    }
+  }
+  Ok(())
+}
+
+/// Publish a single package to a mirror registry, idempotently and with 429 back-off.
+async fn mirror_publish_package(
+  input: &ReleaseRequest,
+  package: &Package,
+  workspace_root: &Utf8Path,
+  registry: Option<&str>,
+  token: &Option<SecretString>,
+  mirror: &MirrorRegistry,
+) -> anyhow::Result<()> {
+  // Idempotent: skip versions already on the mirror.
+  let already = is_published(
+    workspace_root,
+    package,
+    input.publish_timeout,
+    registry,
+    None,
+    token.as_ref(),
+  )
+  .await
+  .with_context(|| {
+    format!(
+      "can't determine if {} is on mirror `{}`",
+      package.name, mirror.name
+    )
+  })?;
+  if already {
+    info!(
+      "{} {}: already on mirror `{}`",
+      package.name, package.version, mirror.name
+    );
+    return Ok(());
+  }
+
+  loop {
+    let output = run_cargo_publish(package, input, workspace_root, token, registry, true)
+      .context("failed to run cargo publish for mirror")?;
+    let succeeded = output.status.success()
+      && output.stderr.contains("Uploading")
+      && !output.stderr.contains("error:");
+    if succeeded {
+      if !input.dry_run {
+        wait_until_published(
+          workspace_root,
+          package,
+          input.publish_timeout,
+          registry,
+          None,
+          token.as_ref(),
+        )
+        .await?;
+      }
+      info!(
+        "{} {}: mirrored to `{}`",
+        package.name, package.version, mirror.name
+      );
+      return Ok(());
+    }
+    // Race: another run published this version first.
+    if mirror_already_published(&output, package) {
+      info!(
+        "{} {}: already on mirror `{}` (race)",
+        package.name, package.version, mirror.name
+      );
+      return Ok(());
+    }
+    // Rate limited: back off and retry.
+    if mirror.retry_on_429 && crate::is_rate_limited(&output.stderr) {
+      let backoff = mirror.batch_gap_secs.max(60);
+      warn!(
+        "rate limited mirroring {} to `{}`; backing off {backoff}s",
+        package.name, mirror.name
+      );
+      tokio::time::sleep(Duration::from_secs(backoff)).await;
+      continue;
+    }
+    anyhow::bail!(
+      "failed to mirror {} to `{}`: {}",
+      package.name,
+      mirror.name,
+      output.stderr
+    );
+  }
+}
+
+/// Lightweight "already published" detection for the mirror (no `ReleaseInfo` needed).
+fn mirror_already_published(output: &CmdOutput, package: &Package) -> bool {
+  let already_uploaded = format!("crate version `{}` is already uploaded", package.version);
+  let already_exists = format!("crate {}@{} already exists", package.name, package.version);
+  output.stderr.contains(&already_uploaded) || output.stderr.contains(&already_exists)
 }
 
 async fn release_package_if_needed(
@@ -933,6 +1115,7 @@ async fn release_package(
       workspace_root,
       &publish_token,
       registry_name,
+      input.is_self_contained(),
     )
     .context("failed to run cargo publish")?;
     if !output.status.success()
@@ -1228,6 +1411,7 @@ fn run_cargo_publish(
   workspace_root: &Utf8Path,
   token: &Option<SecretString>,
   registry: Option<&str>,
+  force_allow_dirty: bool,
 ) -> anyhow::Result<CmdOutput> {
   let mut args = vec!["publish"];
   args.push("--color");
@@ -1238,7 +1422,7 @@ fn run_cargo_publish(
   // See https://github.com/release-plz/release-plz/issues/1545
   args.push("--package");
   args.push(&package.name);
-  if let Some(registry) = &input.registry {
+  if let Some(registry) = registry {
     args.push("--registry");
     args.push(registry);
   }
@@ -1250,9 +1434,9 @@ fn run_cargo_publish(
   if input.dry_run {
     args.push("--dry-run");
   }
-  // Self-contained publishing intentionally edits the manifest in the checkout, so the
-  // tree is dirty by design; allow it.
-  if input.allow_dirty(&package.name) || input.is_self_contained() {
+  // Self-contained / mirror publishing intentionally edits the manifest in the checkout,
+  // so the tree is dirty by design; allow it.
+  if input.allow_dirty(&package.name) || force_allow_dirty {
     args.push("--allow-dirty");
   }
   if input.no_verify(&package.name) {

@@ -220,6 +220,22 @@ impl Config {
         release_request = release_request.with_self_contained(true);
       }
     }
+    // Registries after the primary are mirrors (e.g. crates.io).
+    let mirrors: Vec<zen_release_core::MirrorRegistry> = self
+      .registry
+      .iter()
+      .skip(1)
+      .map(|r| zen_release_core::MirrorRegistry {
+        name: r.name.clone(),
+        strip_alt_registry: r.strip_alt_registry.unwrap_or(false),
+        batch_size: r.batch_size.unwrap_or(0),
+        batch_gap_secs: r.batch_gap_secs.unwrap_or(0),
+        retry_on_429: r.retry_on_429.unwrap_or(false),
+      })
+      .collect();
+    if !mirrors.is_empty() {
+      release_request = release_request.with_mirrors(mirrors);
+    }
 
     for (package, config) in self.packages() {
       let mut release_config = config.clone();
