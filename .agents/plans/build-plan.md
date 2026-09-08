@@ -48,6 +48,17 @@ Legend: acceptance = what must be true to mark the phase done (all under the qua
 
 **Acceptance:** a lockstep release of N crates (N > batch_size) publishes to the mirror across batches without tripping the crates.io burst limit; re-running completes any skipped crates; a mid-run 429 defers rather than fails.
 
+**Wiring recipe (primitives all exist and are unit-tested — this is the remaining integration, needs Docker to verify):**
+1. Thread mirror registries into `ReleaseRequest` (e.g. `mirror_registries: Vec<MirrorConfig>` with name/strip_alt_registry/batch_size/batch_gap_secs/retry_on_429). Populate in `config.fill_release_config` from `self.registry.get(1..)` where `kind == crates-io`.
+2. In `release_packages`, after the primary publish loop completes, for each mirror registry run a mirror pass:
+   a. Order packages via the existing `project.publishable_packages()` (already release-ordered).
+   b. Strip internal-dep registry markers with `Manifest::strip_dependencies_registry` in the checkout, guarded by a `ManifestBackup` (same pattern as `self_contained.rs`) so the tree is restored after.
+   c. `into_batches(packages, batch_size)`; between batches `tokio::time::sleep(batch_gap_secs)`.
+   d. For each package: skip if `is_published` (idempotent); else `run_cargo_publish` to `--registry <mirror>` (or crates.io default). On failure, if `is_rate_limited(stderr)` and `retry_on_429`, defer (re-queue / backoff) instead of bailing; reuse `wait_until_published` for index waits.
+3. crates.io token: reuse `find_registry_token` / trusted-publishing path already in `release_package`.
+4. Tests: unit-test the batch/skip/defer control flow by injecting a fake publish closure (decouple from real cargo); integration-test the real publish under the docker suite.
+Note: because self-contained (primary) and stripped (mirror) forms are both needed in one run, factor the "backup → transform → publish → restore" into a shared helper so primary and mirror passes reuse it.
+
 ---
 
 ## Phase 4 — Bump defaults (Jetstream) + tag-baseline default

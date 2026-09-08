@@ -3,7 +3,7 @@
 **Target:** feature-complete per `AGENTS.md`, critical path (Phases 1–3) working, by morning.
 **Last updated:** 2026-09-07 (late) — build loop paused; see status.
 
-> **STATUS: BUILDING (loop resumed, job `615ebdc7`).** User answered the 3 decisions (recorded in `decisions/decisions.md`): self-contained = in-place-with-restore; mirror = inline; pre-1.0 = patch-only (bump flags stay off). Phases 1, 2 (incl. application), 4-core, and Phase 3 primitives are landed and **unit-gate-green**. Publish-path code (Phase 2 application; Phase 3 mirror once wired) compiles + unit-tests here but its end-to-end behavior needs the **Docker integration suite** (unavailable in this session) — run it in CI/morning before a real release. Next: wire the Phase 3 mirror publish loop.
+> **STATUS: PAUSED at the Docker boundary.** Decisions answered (see `decisions/decisions.md`). **Landed & unit-gate-green:** Phase 1 (config model), Phase 2 (transform + application, in-place+RAII-restore), Phase 4-core (bump knobs + Jetstream config), Phase 3 primitives (`into_batches`, `is_rate_limited`, `strip_dependencies_registry`). **Remaining = Phase 3 mirror orchestration** — a second publish pass; all its building blocks exist and it's fully spec'd in `plans/build-plan.md` ("Wiring recipe"), but it's pure publish-flow integration that needs the **Docker integration suite** (unavailable here) to verify, so it wasn't built blind. Loop stopped (`615ebdc7`). Restart with `/loop` once you can run the integration suite, or hand me a runner with Docker.
 
 ## Gate status
 
@@ -82,4 +82,6 @@ Decisions to confirm in the morning: (a) Phase 2 in-place-restore vs temp-copy; 
 - 2026-09-07 — **Phase 2 core**: `Manifest::set_dependencies_registry`/`strip_dependencies_registry` (4 tests) + `ReleaseRequest` self-contained plumbing wired from config. Application on the publish path deferred (needs integration). Pushed.
 - 2026-09-07 — **Phase 4 core**: plumbed `breaking_always_increment_major` + `no_increment_regex` (2 tests, schema); Jetstream `no_increment_regex` set in `zen-release.toml` (^breaking→major omitted to stay <1.0). Pushed.
 - 2026-09-07 — **Phase 3 primitives**: `mirror.rs` with `into_batches` + `is_rate_limited` (6 tests). Pushed.
-- 2026-09-07 — **Loop paused.** Reached the ceiling of safely-verifiable work; remaining tasks need the integration suite or design decisions (see Remaining / Decisions). Cron `c33c8ffe` stopped. Dispatched summary to user. Commits: c995cee..529d772 on main.
+- 2026-09-07 — **Loop paused #1** (cron `c33c8ffe` stopped); dispatched decisions request. Commits c995cee..529d772.
+- 2026-09-07 — User answered 3 decisions. **Loop resumed** (`615ebdc7`). **Phase 2 application landed**: `self_contained.rs` (apply + `ManifestBackup` RAII restore), wired into `release_packages`, forced `--allow-dirty`; unit test green. Commits 529d772..e283c48.
+- 2026-09-07 — **Loop paused #2** (`615ebdc7` stopped) at the Docker boundary. Only Phase 3 mirror orchestration remains; fully spec'd (build-plan "Wiring recipe"), needs Docker to verify. Dispatched status.
