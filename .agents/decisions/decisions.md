@@ -42,6 +42,12 @@ Locked decisions. Don't re-litigate; if one changes, edit it here with the date 
 - `zen-release` **0.0.0 placeholder** reserved on crates.io (name available; publish is the user's to run).
 - Repo self-release workflow still `uses: release-plz/action@<sha>` as a bootstrap until our own action ships.
 
+## Publish-path decisions (2026-09-07, resolved with user)
+
+- **Self-contained application → in-place with guaranteed restore.** Implemented (`self_contained.rs`): rewrite the internal deps in the (ephemeral CI) checkout just before publishing, publish with forced `--allow-dirty`, and restore the original manifest bytes via a `ManifestBackup` RAII guard on any scope exit (return/error/panic). This meets the user's goal — the repo is never left modified — while reusing the existing in-place publish path, avoiding threading temp manifest paths through the whole call chain (simpler, lower risk than a full temp-copy). Revisit if the mirror flow (Phase 3) needs both self-contained and stripped forms in one run. (User deferred the call.)
+- **crates.io mirror → inline** in the release run (not a server-side webhook). crates.io allows a burst (~30 publishes) then throttles (~1/min); with `retry_on_429` the tool self-paces when throttled, and `batch_size`/`batch_gap_secs` tune it. Long mirror runs (dozens of crates) are acceptable.
+- **Pre-1.0 = patch-only.** Keep `^breaking`→major and `features_always_increment_minor` OFF. With those off on 0.x, feat/fix/refactor/docs all bump patch; only a `breaking:` commit would bump minor — so patch-only holds as long as we don't author `breaking:` commits (which we're already avoiding). Revisit at 1.0.
+
 ## Registries (to be built — Phase 1)
 
 - Config gets a `[[registry]]` array: one **primary** + optional **mirror(s)**. Keys (proposed, to confirm): `name`, `kind`, `index`, `token`, `self_contained`, `strip_alt_registry`, `batch_size`, `batch_gap_secs`, `retry_on_429`.

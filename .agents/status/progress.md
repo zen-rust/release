@@ -3,7 +3,7 @@
 **Target:** feature-complete per `AGENTS.md`, critical path (Phases 1–3) working, by morning.
 **Last updated:** 2026-09-07 (late) — build loop paused; see status.
 
-> **STATUS: PAUSED — awaiting morning decisions.** All safely-verifiable, in-plan work is done and gate-green (Phases 1, 2-core, 4-core, 3-primitives). Everything remaining touches the **hot publish path** and needs the docker/integration suite (unavailable in this session) or a design decision. The 5-minute build loop was stopped to avoid idle ticks and shipping unverified publish-path code overnight. See **Remaining / morning** and **Decisions to confirm**. Restart with `/loop` after decisions.
+> **STATUS: BUILDING (loop resumed, job `615ebdc7`).** User answered the 3 decisions (recorded in `decisions/decisions.md`): self-contained = in-place-with-restore; mirror = inline; pre-1.0 = patch-only (bump flags stay off). Phases 1, 2 (incl. application), 4-core, and Phase 3 primitives are landed and **unit-gate-green**. Publish-path code (Phase 2 application; Phase 3 mirror once wired) compiles + unit-tests here but its end-to-end behavior needs the **Docker integration suite** (unavailable in this session) — run it in CI/morning before a real release. Next: wire the Phase 3 mirror publish loop.
 
 ## Gate status
 
@@ -27,7 +27,7 @@
 | # | Phase | Priority | Status |
 |---|---|---|---|
 | 1 | Config model: `[project]` + `[[registry]]` array | critical-path | ✅ done (gate-green) |
-| 2 | Self-containment: rewrite internal deps to `registry = "…"` | critical-path | ◐ in progress |
+| 2 | Self-containment: rewrite internal deps to `registry = "…"` | critical-path | ◐ implemented (unit-green); Docker integration pending |
 | 3 | crates.io mirror + rate-safe batching + 429 retry | critical-path | ◐ primitives done; orchestration deferred |
 | 4 | Bump defaults (Jetstream ruleset) + tag-baseline default | important | ◐ knobs+config done; tag-baseline deferred |
 | 5 | Whole-repo release PR + opt-in flag (default false) | secondary | ☐ not started |
@@ -45,7 +45,7 @@
 
 - [x] `Manifest::set_dependencies_registry(internal_deps, registry)` + `strip_dependencies_registry(internal_deps)` in `cargo_utils/src/manifest.rs`: adds/removes `registry = "…"` across normal/dev/build, `target.*`, and `[workspace.dependencies]`; expands bare version strings; skips `workspace = true` entries; matches renamed deps by `package`. 4 unit tests, gate-green.
 - [x] Thread primary registry (name + `self_contained`) from config into `ReleaseRequest`: `self_contained` field + `with_self_contained()`/`is_self_contained()` on `ReleaseRequest`; `fill_release_config` reads the first `[[registry]]` → sets registry + self_contained. Inert unless a `[[registry]]` is configured. Gate-green.
-- [ ] **DEFERRED (needs integration test / morning review):** apply `set_dependencies_registry` on the hot publish path. `release` publishes in-place from the CI-ephemeral checkout (`release.rs:572`, not a temp copy), so application means transiently rewriting `package.manifest_path`, forcing `--allow-dirty`, publishing, then restoring — a delicate change on the real publish path that the docker/integration suite (unavailable in this session) must verify. `is_self_contained()` is the hook.
+- [x] Apply on the publish path (`self_contained.rs`): `apply_self_containment` rewrites internal deps in the checkout before publishing; `ManifestBackup` RAII guard restores originals on any exit; `run_cargo_publish` forces `--allow-dirty` when self-contained. Wired in `release_packages`. Unit test (apply+restore) green. **Docker integration pending** (verify a real self-contained publish end-to-end).
 
 ## Phase 4 sub-tasks
 
@@ -62,8 +62,8 @@
 
 Ranked; the first two are the critical path but need integration verification:
 
-1. **Phase 2 application** — apply `Manifest::set_dependencies_registry` on the publish path (hook: `ReleaseRequest::is_self_contained()`). Design: `release` publishes in-place from the CI checkout, so transiently rewrite `package.manifest_path` + force `--allow-dirty` + restore, OR switch self-contained publishes to a temp copy. Needs integration test.
-2. **Phase 3 — crates.io mirror + batching** — mirror step for `kind = crates-io`: strip registry markers (`strip_dependencies_registry`, done), publish dependency-ordered in `batch_size` batches with `batch_gap_secs`, 429 defer/retry, idempotent skip. Touches the publish loop (`release.rs:626`). Needs integration test.
+1. ~~Phase 2 application~~ — DONE (in-place + RAII restore, `self_contained.rs`). Docker integration verification still pending.
+2. **Phase 3 — crates.io mirror + batching** (next) — inline mirror step for `kind = crates-io`: strip registry markers (`strip_dependencies_registry`, done), publish dependency-ordered in `batch_size` batches (`into_batches`, done) with `batch_gap_secs`, 429 defer/retry (`is_rate_limited`, done), idempotent skip (reuse `is_published`). Wire into/after the publish loop (`release.rs`). Needs integration test.
 3. **Phase 4 tag-baseline default** — engine change (decouple baseline from publish mode).
 4. **Phase 5** — whole-repo PR + opt-in flag (default false).
 5. **Phase 6** — `packages_dir` subtree scoping.
