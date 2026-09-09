@@ -242,7 +242,9 @@ impl ReleaseRequest {
             .flatten()
             // if the registry is not the same as the request or if there's no token in the request,
             // try to find the token in the Cargo credentials file or in the environment variables.
-            .or(cargo_utils::registry_token(self.registry.as_deref())?);
+            // Look up the token for the *requested* registry (not the request's default), so
+            // mirror publishes use the mirror's token.
+            .or(cargo_utils::registry_token(registry)?);
     Ok(token)
   }
 
