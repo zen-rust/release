@@ -1,15 +1,75 @@
+# =============================================================================
+# zen-release.toml — configuration reference
+# Loaded automatically by `zen-release` from the repo root (or ./.zen-release.toml).
+# Uncommented lines are what THIS repo uses; commented lines document the other knobs.
+# JSON schema: .schema/latest.json
+# =============================================================================
+
+# ---- Registries --------------------------------------------------------------
+# Where packages are published. The FIRST [[registry]] is the primary (published
+# first, in dependency order); any additional ones are mirrors, published after.
+# Omit this section entirely to skip cargo publishing (binary-only distribution) —
+# which is what this repo currently does (see `publish = false` below).
+#
+# Primary (e.g. a private Kellnr registry):
+# [[registry]]
+# name = "zenrust"              # cargo registry name; must exist in your Cargo config
+# kind = "kellnr"              # kellnr | sparse | crates-io  (informational)
+# index = "sparse+https://crates.zenrs.org/api/v1/crates/"   # optional; else from Cargo config
+# self_contained = true        # rewrite internal deps to `registry = "zenrust"` before publish
+# # token: taken from the CARGO_REGISTRIES_ZENRUST_TOKEN env var (not stored here)
+#
+# Mirror (e.g. crates.io):
+# [[registry]]
+# name = "crates-io"
+# kind = "crates-io"
+# strip_alt_registry = true    # strip `registry = "..."` from internal deps (crates.io rule)
+# batch_size = 18              # publish in rate-safe batches of this many crates
+# batch_gap_secs = 3600        # seconds to wait between batches
+# retry_on_429 = true          # back off and retry when the registry rate-limits (HTTP 429)
+# # token: taken from the CARGO_REGISTRY_TOKEN env var
+
+# ---- Workspace defaults (apply to every package unless overridden per-package) -
 [workspace]
+
+# --- Publishing ---
+publish = false                 # false = do NOT cargo-publish (binary distribution).
+                                # Set true (and add a [[registry]] above) to publish crates.
+# publish_no_verify = false     # add --no-verify to cargo publish
+# publish_allow_dirty = false   # add --allow-dirty to cargo publish
+dependencies_update = false     # run `cargo update` on internal deps during a release
+# repo_url = "https://github.com/zen-rust/release"  # inferred from the git remote if unset
+# publish_timeout = "30m"       # how long to wait for a crate to appear in the index
+
+# --- Versioning: conventional-commit prefixes (Jetstream rules) ---
+no_increment_regex = "^(wip|chore)"          # commit types that trigger NO release
+# custom_major_increment_regex = "^breaking" # commit type that forces a MAJOR bump
+# custom_minor_increment_regex = "^feat"     # commit type that forces a MINOR bump
+# breaking_always_increment_major = false    # true = breaking changes bump major even on 0.x
+# features_always_increment_minor = false    # true = feat bumps minor even on 0.x
+# release_commits = "^(feat|fix)"            # only release when a commit matches this
+# max_analyze_commits = 1000                 # cap on commits scanned per package
+
+# --- When to release / whether to open a PR ---
+# release_always = true         # true = release on every push; false = only after a release-PR merge
+# A release PR is opened by running the `release-pr` command (vs `release`) — see the
+# workflow. These fields shape that PR:
+# pr_branch_prefix = "release-" # branch name prefix for the release PR
+# pr_name = "chore: release"    # Tera template for the PR title
+# pr_body = "..."               # Tera template for the PR body
+# pr_draft = false              # open the PR as a draft
+# pr_labels = ["release"]       # labels to add to the PR
+
+# --- Git tag + GitHub/Gitea/GitLab release (defaults off here; enabled per-package) ---
+git_tag_enable = false
 git_release_enable = false
-dependencies_update = false # TODO: re-enable when `cargo update` works in this project
+# git_release_type = "prod"     # prod | pre | auto (auto = pre-release if the version is a prerelease)
+# git_release_draft = false
+# git_release_latest = true
+# git_release_generate_notes = false   # GitHub-only: auto-generate release notes
 
-# Jetstream Labs conventional-commit rules (see AGENTS.md "Default conventional-commit rules").
-# `wip` and `chore` commits do not trigger a release.
-no_increment_regex = "^(wip|chore)"
-# NOTE: `custom_major_increment_regex = "^breaking"` (breaking -> major) is intentionally
-# omitted while zen-release is pre-1.0, so releases stay under 1.0. Enable it at 1.x.
-# (Scope-based `none` rules — feat(style):/feat(test): — are not expressible via a type regex
-# yet; tracked as a future enhancement.)
-
+# --- Changelog (git-cliff) ---
+# changelog_config = "./git-cliff.toml"   # path to a git-cliff config for changelog formatting
 git_release_body = """
 {{ changelog }}
 {% if remote.contributors %}
@@ -20,9 +80,16 @@ git_release_body = """
 {% endif %}
 """
 
-[[package]] # the double square brackets define a TOML table array
-name = "zen_release" # name of the package to configure
-changelog_include = ["zen_release_core"] # include commits from `release_core` in the changelog
-# set the path of the changelog to the root of the repository
-changelog_path = "./CHANGELOG.md"
-git_release_enable = true # create GitHub release
+# ---- Per-package overrides -----------------------------------------------------
+# Only the `zen_release` binary crate gets a user-facing tag + GitHub release; the
+# helper crates are versioned alongside it but not tagged/released individually.
+[[package]]
+name = "zen_release"
+git_tag_enable = true
+git_release_enable = true
+git_tag_name = "zen-release-v{{ version }}"       # Tera template for the tag
+git_release_name = "zen-release-v{{ version }}"   # Tera template for the release title
+changelog_include = ["zen_release_core"]          # fold these crates' commits into the changelog
+changelog_path = "./CHANGELOG.md"                 # write the changelog at the repo root
+# semver_check = true          # run cargo-semver-checks (libraries only)
+# version_group = "core"       # crates in the same group share one version (lockstep subset)
