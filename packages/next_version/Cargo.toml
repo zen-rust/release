@@ -1,12 +1,17 @@
 [package]
-name = "next_version"
-version = "0.0.1"
+name = "zen_next_version"
+version = "0.0.2"
 edition.workspace = true
 description = "Determine next semantic version based on conventional commits"
 license.workspace = true
 repository = "https://github.com/zen-rust/release/tree/main/packages/next_version"
 keywords = ["semver", "semantic", "versioning", "conventional", "commits"]
 categories = ["development-tools", "parsing"]
+
+# Published as `zen_next_version`, but the library target keeps the `next_version` name so
+# existing imports (including this crate's own integration tests) are unchanged.
+[lib]
+name = "next_version"
 
 [lints]
 workspace = true

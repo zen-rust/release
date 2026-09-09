@@ -98,10 +98,10 @@ mod tests {
     assert_eq!(
       order(pkgs),
       [
-        "cargo_utils",
-        "git_cmd",
-        "test_logs",
-        "next_version",
+        "zen_cargo_utils",
+        "zen_git_cmd",
+        "zen_test_logs",
+        "zen_next_version",
         "zen_release_core",
         "zen_release"
       ]

@@ -1,6 +1,6 @@
 [package]
-name = "git_cmd"
-version = "0.0.1"
+name = "zen_git_cmd"
+version = "0.0.2"
 edition.workspace = true
 description = "Wrapper around git cli"
 repository = "https://github.com/zen-rust/release/tree/main/packages/git_cmd"
@@ -23,7 +23,7 @@ tracing.workspace = true
 fs-err.workspace = true
 
 [dev-dependencies]
-git_cmd = { path = ".", features = ["test_fixture"]}
-test_logs = { path = "../test_logs" }
+git_cmd = { path = ".", package = "zen_git_cmd", features = ["test_fixture"] }
+test_logs = { path = "../test_logs", package = "zen_test_logs" }
 
 tempfile.workspace = true

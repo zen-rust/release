@@ -623,24 +623,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cargo_utils"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "cargo_metadata",
- "dirs",
- "dunce",
- "expect-test",
- "fs-err",
- "secrecy 0.10.3",
- "semver",
- "serde",
- "toml 1.1.4+spec-1.1.0",
- "toml_edit",
- "url",
-]
-
-[[package]]
 name = "cc"
 version = "1.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1360,15 +1342,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fake_package"
-version = "0.0.1"
-dependencies = [
- "cargo_metadata",
- "cargo_utils",
- "serde_json",
-]
-
-[[package]]
 name = "fallible-iterator"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1638,7 +1611,7 @@ dependencies = [
  "git-conventional 0.12.9",
  "glob",
  "indexmap",
- "next_version 0.2.26",
+ "next_version",
  "regex",
  "rust-embed",
  "secrecy 0.8.0",
@@ -1701,19 +1674,6 @@ dependencies = [
  "git2",
  "log",
  "url",
-]
-
-[[package]]
-name = "git_cmd"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "camino",
- "fs-err",
- "git_cmd",
- "tempfile",
- "test_logs",
- "tracing",
 ]
 
 [[package]]
@@ -3503,15 +3463,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "536bfad37a309d62069485248eeaba1e8d9853aaf951caaeaed0585a95346f08"
 dependencies = [
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "next_version"
-version = "0.0.1"
-dependencies = [
- "git-conventional 1.1.0",
- "regex",
- "semver",
 ]
 
 [[package]]
@@ -5369,15 +5320,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
 
 [[package]]
-name = "test_logs"
-version = "0.0.1"
-dependencies = [
- "tracing",
- "tracing-log",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6325,6 +6267,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "zen_cargo_utils"
+version = "0.0.2"
+dependencies = [
+ "anyhow",
+ "cargo_metadata",
+ "dirs",
+ "dunce",
+ "expect-test",
+ "fs-err",
+ "secrecy 0.10.3",
+ "semver",
+ "serde",
+ "toml 1.1.4+spec-1.1.0",
+ "toml_edit",
+ "url",
+]
+
+[[package]]
+name = "zen_fake_package"
+version = "0.0.1"
+dependencies = [
+ "cargo_metadata",
+ "serde_json",
+ "zen_cargo_utils",
+]
+
+[[package]]
+name = "zen_git_cmd"
+version = "0.0.2"
+dependencies = [
+ "anyhow",
+ "camino",
+ "fs-err",
+ "tempfile",
+ "tracing",
+ "zen_git_cmd",
+ "zen_test_logs",
+]
+
+[[package]]
+name = "zen_next_version"
+version = "0.0.2"
+dependencies = [
+ "git-conventional 1.1.0",
+ "regex",
+ "semver",
+]
+
+[[package]]
 name = "zen_release"
 version = "0.0.1"
 dependencies = [
@@ -6332,17 +6323,14 @@ dependencies = [
  "assert_cmd",
  "base64 0.23.1",
  "cargo_metadata",
- "cargo_utils",
  "chrono",
  "clap",
  "clap_complete",
  "dirs",
  "expect-test",
  "fake",
- "fake_package",
  "fs-err",
  "git-cliff-core",
- "git_cmd",
  "pretty_assertions",
  "regex",
  "reqwest",
@@ -6351,14 +6339,17 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "test_logs",
  "tokio",
  "toml 1.1.4+spec-1.1.0",
  "toml_edit",
  "tracing",
  "tracing-subscriber",
  "url",
+ "zen_cargo_utils",
+ "zen_fake_package",
+ "zen_git_cmd",
  "zen_release_core",
+ "zen_test_logs",
 ]
 
 [[package]]
@@ -6370,21 +6361,17 @@ dependencies = [
  "cargo",
  "cargo-util-terminal",
  "cargo_metadata",
- "cargo_utils",
  "chrono",
  "dunce",
  "expect-test",
  "fake",
- "fake_package",
  "fs-err",
  "git-cliff-core",
  "git2",
- "git_cmd",
  "h2",
  "http",
  "ignore",
  "itertools",
- "next_version 0.0.1",
  "parse-changelog",
  "rand 0.10.2",
  "rayon",
@@ -6398,7 +6385,6 @@ dependencies = [
  "strip-ansi-escapes",
  "tempfile",
  "tera 2.3.0",
- "test_logs",
  "tokio",
  "toml 1.1.4+spec-1.1.0",
  "toml_edit",
@@ -6407,6 +6393,20 @@ dependencies = [
  "urlencoding",
  "walkdir",
  "wiremock",
+ "zen_cargo_utils",
+ "zen_fake_package",
+ "zen_git_cmd",
+ "zen_next_version",
+ "zen_test_logs",
+]
+
+[[package]]
+name = "zen_test_logs"
+version = "0.0.2"
+dependencies = [
+ "tracing",
+ "tracing-log",
+ "tracing-subscriber",
 ]
 
 [[package]]

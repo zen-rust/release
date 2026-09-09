@@ -7,6 +7,7 @@ Locked decisions. Don't re-litigate; if one changes, edit it here with the date 
 - **Product / brand:** `zen-release` (tool). Framework it was born from: **Zenrust** (org `zen-rust`, repo `zen-rust/release`).
 - **Directories:** `packages/` (not `crates/`). First-party crate dirs: `packages/release`, `packages/release_core`.
 - **Crate (package) names:** `zen_release` (binary crate) and `zen_release_core` (lib). *Directories dropped the `zen_` prefix; package names kept it.*
+- **Helper crates published under `zen_` names too** (to own them on a registry): packages `zen_cargo_utils`, `zen_git_cmd`, `zen_next_version`, `zen_test_logs`, `zen_fake_package` — **folder names and imports unchanged**. Achieved via `package = "zen_…"` on each internal dependency (import key stays the old name) plus `[lib] name = "next_version"` on next_version (its own tests self-import). Every crate also carries a copy of root `LICENSE.md` for registry packaging.
 - **Binary / command:** `zen-release` (via `[[bin]] name` on the `zen_release` package, so the branded command survives the crate rename).
 - **Config file:** `zen-release.toml` (and `.zen-release.toml`).
 - **Env vars:** `ZEN_RELEASE_*` (e.g. `ZEN_RELEASE_LOG`, `ZEN_RELEASE_NO_ANSI`, `ZEN_RELEASE_TOKEN`).

@@ -17,9 +17,9 @@ all-static = ["cargo/vendored-libgit2", "cargo/all-static"]
 
 [dependencies]
 base64.workspace = true
-cargo_utils = { path = "../cargo_utils", version = "0.0.1" }
-git_cmd = { path = "../git_cmd", version = "0.0.1" }
-next_version = { path = "../next_version", version = "0.0.1" }
+cargo_utils = { path = "../cargo_utils", package = "zen_cargo_utils", version = "0.0.2" }
+git_cmd = { path = "../git_cmd", package = "zen_git_cmd", version = "0.0.2" }
+next_version = { path = "../next_version", package = "zen_next_version", version = "0.0.2" }
 
 anyhow.workspace = true
 cargo_metadata.workspace = true
@@ -57,9 +57,9 @@ urlencoding.workspace = true
 git2.workspace = true
 
 [dev-dependencies]
-git_cmd = { path = "../git_cmd", features = ["test_fixture"] }
-test_logs = { path = "../test_logs" }
-fake_package = { path = "../fake_package" }
+git_cmd = { path = "../git_cmd", package = "zen_git_cmd", features = ["test_fixture"] }
+test_logs = { path = "../test_logs", package = "zen_test_logs" }
+fake_package = { path = "../fake_package", package = "zen_fake_package" }
 
 expect-test.workspace = true
 fake.workspace = true

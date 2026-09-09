@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2](https://github.com/zen-rust/release/compare/test_logs-v0.0.1...test_logs-v0.0.2) - 2026-09-09
+
+### Other
+
+- initial commit
+
 ## [0.1.33](https://github.com/release-plz/release-plz/compare/test_logs-v0.1.32...test_logs-v0.1.33) - 2025-09-13
 
 ### Other

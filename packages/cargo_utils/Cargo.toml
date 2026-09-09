@@ -1,6 +1,6 @@
 [package]
-name = "cargo_utils"
-version = "0.0.1"
+name = "zen_cargo_utils"
+version = "0.0.2"
 edition.workspace = true
 description = "Utilities around cargo and Rust workspaces"
 repository = "https://github.com/zen-rust/release/tree/main/packages/cargo_utils"

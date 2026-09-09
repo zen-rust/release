@@ -425,7 +425,7 @@ mod tests {
     let local_manifest = Utf8Path::new("../fake_package/Cargo.toml");
     let result = get_project(local_manifest, None, &HashSet::default(), false, None, None);
     assert!(result.is_err());
-    expect_test::expect![[r#"no public packages found. Are there any public packages in your project? Analyzed packages: ["cargo_utils", "fake_package", "git_cmd", "test_logs", "next_version", "zen_release", "zen_release_core"]"#]]
+    expect_test::expect![[r#"no public packages found. Are there any public packages in your project? Analyzed packages: ["zen_cargo_utils", "zen_fake_package", "zen_git_cmd", "zen_test_logs", "zen_next_version", "zen_release", "zen_release_core"]"#]]
         .assert_eq(&result.unwrap_err().to_string());
   }
 
