@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-24.04
+    if: ${{ github.repository_owner == 'zen-rust' }}
+    permissions:
+      contents: write # create the git tag, push the version-bump commit, and cut the GitHub release
+    steps:
+      # A GitHub App token (not the default GITHUB_TOKEN) is used so the tag and release
+      # zen-release creates can trigger the downstream `cd.yml` / `docker.yml` workflows.
+      - name: Generate GitHub token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history so versions can be computed from commits/tags
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      - name: Build zen-release
+        run: cargo build --release --bin zen-release
+      - name: Run zen-release (loads ./zen-release.toml)
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: ./target/release/zen-release release --git-token "${{ steps.app-token.outputs.token }}" --forge github
